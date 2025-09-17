@@ -1,8 +1,32 @@
+@font-face {
+  font-family: 'GT Ultra';
+  src: url('/fonts/GT_Ultra/GTUltra-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: url('/fonts/GT_Ultra/GTUltraFine-Light.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nupt';
+  src: url('/fonts/nuptial_liberty/Nuptial Liberty.ttf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #8c4100ff;
 }
 
 @theme inline {
@@ -12,6 +36,39 @@
   --font-mono: var(--font-geist-mono);
 }
 
+
+.masked-bg {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.masked-bg-img {
+  position: absolute;
+  left: 43.35%;
+  top: 51.5%;
+  width: 150vw; /* increase for more zoom */
+  height: 110vh;
+  object-fit: cover;
+  object-position: 85% 80%; /* adjust these to center your object */
+  transform: translate(-50%, -51%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.masked-bg::after {
+  content: "";
+  position: absolute;
+  background-color: #ffd29d;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse var(--ellipse-width, 200px) var(--ellipse-height, 120px) at 50% 50%, transparent 0, transparent var(--ellipse-width, 200px) var(--ellipse-height, 120px), black 10px, black 100vw);
+  -webkit-mask-image: radial-gradient(ellipse var(--ellipse-width, 200px) var(--ellipse-height, 120px) at 50% 50%, transparent 0, transparent var(--ellipse-width, 200px) var(--ellipse-height, 120px), black 10px, black 100vw);
+}
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -23,4 +80,51 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Navigation Bar Styles */
+.navbar {
+  position: fixed;
+  top: -100px;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  transition: top 0.3s ease-in-out;
+}
+
+.navbar.show {
+  top: 0;
+}
+
+.navbar-brand {
+  font-family: 'GT Ultra', serif;
+  font-size: 1.5rem;
+  font-weight: normal;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.navbar-nav {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-nav a {
+  font-family: 'GT Ultra Fine', sans-serif;
+  font-size: 1rem;
+  color: var(--foreground);
+  text-decoration: none;
+  transition: opacity 0.3s ease;
+}
+
+.navbar-nav a:hover {
+  opacity: 0.7;
 }
