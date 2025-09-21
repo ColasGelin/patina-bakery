@@ -2,11 +2,20 @@
 import { useEffect, useState, useRef } from "react";
 import { PatinaLogo } from "./logo";
 import Navbar from "../components/Navbar";
+import { Carousel } from "./carousel";
+import LiquidFillText from "./fillText";
 
 export default function Home() {
   const [ellipse, setEllipse] = useState({ width: 150, height: 90 });
   const [scrollY, setScrollY] = useState(0);
+  const [isSecondSectionVisible, setIsSecondSectionVisible] = useState(false);
+  const [backgroundColorProgress, setBackgroundColorProgress] = useState(0);
+  const [photoScrollOffset, setPhotoScrollOffset] = useState(0);
+  const [textFillProgress, setTextFillProgress] = useState(0);
+  const [isInThirdSection, setIsInThirdSection] = useState(false);
   const ellipseRef = useRef(ellipse);
+  const secondSectionRef = useRef<HTMLDivElement>(null);
+  const thirdSectionRef = useRef<HTMLDivElement>(null);
   
   // Reset to initial state on page load
   useEffect(() => {
@@ -95,6 +104,204 @@ export default function Home() {
   const cx = svgWidth / 2;
   const cy = svgHeight / 2;
 
+  // Intersection observer for second section animation
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsSecondSectionVisible(true);
+          }
+        });
+      },
+      { threshold: 1 }
+    );
+
+    if (secondSectionRef.current) {
+      observer.observe(secondSectionRef.current);
+    }
+
+    return () => {
+      if (secondSectionRef.current) {
+        observer.unobserve(secondSectionRef.current);
+      }
+    };
+  }, []);
+
+  // Check if viewport is in the middle of third section
+  useEffect(() => {
+    const checkThirdSectionPosition = () => {
+      if (thirdSectionRef.current) {
+        const rect = thirdSectionRef.current.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        const sectionTop = rect.top;
+        const sectionBottom = rect.bottom;
+        const sectionHeight = rect.height;
+        
+        // Check if the middle of the viewport is within the middle third of the section
+        const viewportMiddle = windowHeight / 2;
+        const sectionMiddleStart = sectionTop + sectionHeight * 0.5;
+        const sectionMiddleEnd = sectionTop + sectionHeight;
+        
+        const isInMiddleOfSection = viewportMiddle >= sectionMiddleStart && viewportMiddle <= sectionMiddleEnd;
+        setIsInThirdSection(isInMiddleOfSection);
+      }
+    };
+
+    window.addEventListener('scroll', checkThirdSectionPosition);
+    checkThirdSectionPosition(); // Check on mount
+    
+    return () => {
+      window.removeEventListener('scroll', checkThirdSectionPosition);
+    };
+  }, []);
+
+  // Enhanced scroll and wheel handler for third section
+  useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+    
+    const handleThirdSectionWheelEvent = (e: WheelEvent) => {
+      if (isInThirdSection) {
+        // Check if we're at the boundaries and should allow normal scrolling
+        const isScrollingUp = e.deltaY < 0;
+        const isScrollingDown = e.deltaY > 0;
+        
+        // Allow normal scrolling up when fill is empty
+        if (isScrollingUp && textFillProgress <= 0) {
+          document.body.style.overflow = "auto";
+          // Clear any existing timeout
+          clearTimeout(scrollTimeout);
+          // Re-disable overflow after a short delay to prevent interference
+          scrollTimeout = setTimeout(() => {
+            if (isInThirdSection && textFillProgress > 0) {
+              document.body.style.overflow = "hidden";
+            }
+          }, 100);
+          return; // Don't prevent default, allow normal scrolling
+        }
+        
+        // Allow normal scrolling down when fill is full
+        if (isScrollingDown && textFillProgress >= 100) {
+          document.body.style.overflow = "auto";
+          // Clear any existing timeout
+          clearTimeout(scrollTimeout);
+          // Re-disable overflow after a short delay to prevent interference
+          scrollTimeout = setTimeout(() => {
+            if (isInThirdSection && textFillProgress < 100) {
+              document.body.style.overflow = "hidden";
+            }
+          }, 100);
+          return; // Don't prevent default, allow normal scrolling
+        }
+        
+        // Prevent default scrolling and control fill progress
+        document.body.style.overflow = "hidden";
+        e.preventDefault();
+        
+        // Update fill progress based on wheel delta when in middle of section
+        // Positive deltaY (scroll down) increases fill, negative deltaY (scroll up) decreases fill
+        setTextFillProgress(prev => {
+          const delta = e.deltaY * 0.2; // Adjust sensitivity
+          const newProgress = Math.max(0, Math.min(100, prev + delta));
+          return newProgress;
+        });
+      }
+    };
+
+    if (isInThirdSection) {
+      window.addEventListener('wheel', handleThirdSectionWheelEvent, { passive: false });
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+      clearTimeout(scrollTimeout);
+      window.removeEventListener('wheel', handleThirdSectionWheelEvent);
+    };
+  }, [isInThirdSection, textFillProgress]);
+  
+  // Scroll listener for photo gallery and background color change
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setScrollY(currentScrollY);
+      
+      // Calculate photo scroll offset based on scroll position
+      // Photos will scroll left as we scroll down
+      const scrollMultiplier = 0.55; // Adjust speed of horizontal scroll
+      setPhotoScrollOffset(currentScrollY * scrollMultiplier);
+      
+      // Calculate background color progress starting from the second section
+      const windowHeight = window.innerHeight;
+      const firstSectionHeight = windowHeight; // First section is 100vh
+      const secondSectionHeight = windowHeight; // Second section is 100vh
+      
+      if (currentScrollY < firstSectionHeight) {
+        // We're still in the first section, no color change
+        setBackgroundColorProgress(0);
+        if (!isInThirdSection) {
+          setTextFillProgress(0);
+        }
+      } else if (currentScrollY < firstSectionHeight + secondSectionHeight) {
+        // We're in the second section
+        const scrollInSecondSections = currentScrollY - firstSectionHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        const remainingHeight = documentHeight - windowHeight - firstSectionHeight;
+        const progress = Math.min(scrollInSecondSections / remainingHeight, 1);
+        setBackgroundColorProgress(progress);
+        if (!isInThirdSection) {
+          setTextFillProgress(0);
+        }
+      } else {
+        // We're in the third section - only update background color, not text fill
+        // Continue background color progress
+        const scrollInSecondSections = currentScrollY - firstSectionHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        const remainingHeight = documentHeight - windowHeight - firstSectionHeight;
+        const progress = Math.min(scrollInSecondSections / remainingHeight, 1);
+        setBackgroundColorProgress(progress);
+        
+        // Don't update text fill progress here when in third section - let the wheel handler control it
+        if (!isInThirdSection) {
+          const scrollInThirdSection = currentScrollY - firstSectionHeight - secondSectionHeight;
+          const thirdSectionScrollableHeight = windowHeight * 0.8;
+          const fillProgress = Math.min(scrollInThirdSection / thirdSectionScrollableHeight, 1);
+          setTextFillProgress(fillProgress * 100);
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isInThirdSection]);
+
+  // Helper function to interpolate between colors
+  const interpolateColor = (color1: string, color2: string, factor: number) => {
+    const hex1 = color1.replace('#', '');
+    const hex2 = color2.replace('#', '');
+    
+    const r1 = parseInt(hex1.substr(0, 2), 16);
+    const g1 = parseInt(hex1.substr(2, 2), 16);
+    const b1 = parseInt(hex1.substr(4, 2), 16);
+    
+    const r2 = parseInt(hex2.substr(0, 2), 16);
+    const g2 = parseInt(hex2.substr(2, 2), 16);
+    const b2 = parseInt(hex2.substr(4, 2), 16);
+    
+    const r = Math.round(r1 + (r2 - r1) * factor);
+    const g = Math.round(g1 + (g2 - g1) * factor);
+    const b = Math.round(b1 + (b2 - b1) * factor);
+    
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  // Calculate background colors based on scroll progress
+  const getBackgroundColor = () => {
+    // Transition from orange to brown
+    return interpolateColor('#ffd29d', '#ffa575ff', backgroundColorProgress);
+  };
+  
   return (
     <div>
       <Navbar show={showNavbar} />
@@ -187,21 +394,25 @@ export default function Home() {
       {/* Second page/section */}
       <div style={{ 
         minHeight: "100vh", 
-        background: "#ffd29d", 
+        background: getBackgroundColor(), 
         padding: "4rem 2rem",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
-        alignItems: "center"
-      }}>
+        alignItems: "center",
+        transition: "background 0.1s ease-out"
+      }} ref={secondSectionRef}>
         <h1 style={{ 
-          fontFamily: "GT Ultra, serif", 
+          fontFamily: "GT Ultra Fine, serif", 
           fontSize: "3rem", 
           color: "#8c4100ff",
           marginBottom: "2rem",
-          textAlign: "center"
+          textAlign: "center",
+          opacity: isSecondSectionVisible ? 1 : 0,
+          transform: isSecondSectionVisible ? "translateY(0)" : "translateY(20px)",
+          transition: "opacity 0.6s ease-out, transform 0.6s ease-out"
         }}>
-          Welcome to Patina Bakery
+          Welcome to Patina Edinburgh
         </h1>
         <p style={{ 
           fontFamily: "GT Ultra Fine, sans-serif", 
@@ -209,14 +420,80 @@ export default function Home() {
           color: "#333",
           maxWidth: "600px",
           textAlign: "center",
-          lineHeight: "1.6"
+          lineHeight: "1.6",
+          opacity: isSecondSectionVisible ? 1 : 0,
+          transform: isSecondSectionVisible ? "translateY(0)" : "translateY(20px)",
+          transition: "opacity 0.6s ease-out, transform 0.6s ease-out 0.2s"
         }}>
           Discover our artisanal sourdough breads and traditional viennoiseries, 
           crafted with passion and the finest ingredients. Each piece tells a story 
           of time-honored techniques and exceptional taste.
         </p>
+        <Carousel photoScrollOffset={photoScrollOffset} />
       </div>
 
+      {/* Third section with fillable text */}
+      <div 
+        ref={thirdSectionRef}
+        style={{ 
+          minHeight: "100vh", // Made taller to allow more scrolling
+          background: getBackgroundColor(), 
+          padding: "6rem 2rem",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          transition: "background 0.1s ease-out"
+        }}
+      >
+        <div style={{ marginBottom: "4rem" }}>
+          <h2 style={{ 
+            fontFamily: "GT Ultra Fine, serif", 
+            fontSize: "2rem", 
+            color: "#8c4100ff",
+            textAlign: "center",
+            marginBottom: "1rem",
+            opacity: 0.9
+          }}>
+            Our Craft
+          </h2>
+          <p style={{ 
+            fontFamily: "GT Ultra Fine, sans-serif", 
+            fontSize: "1.1rem", 
+            color: "#8c4100ff",
+            maxWidth: "500px",
+            textAlign: "center",
+            lineHeight: "1.6",
+            opacity: 0.8
+          }}>
+            Every loaf tells a story of patience, tradition, and artisanal excellence.
+          </p>
+        </div>
+        
+        <LiquidFillText 
+          fillPercentage={textFillProgress}
+          liquidColor="#8c4100ff"
+          baseColor="#ffd29d"
+          fontSize="8rem"
+          fontFamily="GT Ultra Fine, serif"
+        />
+        
+        <p style={{ 
+          fontFamily: "GT Ultra Fine, sans-serif", 
+          fontSize: "1rem", 
+          color: "#8c4100ff",
+          maxWidth: "400px",
+          textAlign: "center",
+          lineHeight: "1.6",
+          marginTop: "3rem",
+          opacity: 0.7
+        }}>
+          * Or go big on both !
+        </p>
+      </div>
+
+      {/* News section */}
+      
       {/* Add CSS animation */}
       <style jsx>{`
         @keyframes bounce {

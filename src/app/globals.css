@@ -69,12 +69,6 @@
   mask-image: radial-gradient(ellipse var(--ellipse-width, 200px) var(--ellipse-height, 120px) at 50% 50%, transparent 0, transparent var(--ellipse-width, 200px) var(--ellipse-height, 120px), black 10px, black 100vw);
   -webkit-mask-image: radial-gradient(ellipse var(--ellipse-width, 200px) var(--ellipse-height, 120px) at 50% 50%, transparent 0, transparent var(--ellipse-width, 200px) var(--ellipse-height, 120px), black 10px, black 100vw);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
 
 body {
   background: var(--background);
