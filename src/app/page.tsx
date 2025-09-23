@@ -12,6 +12,7 @@ export default function Home() {
   const [backgroundColorProgress, setBackgroundColorProgress] = useState(0);
   const [photoScrollOffset, setPhotoScrollOffset] = useState(0);
   const [textFillProgress, setTextFillProgress] = useState(0);
+  const [isTextFillComplete, setIsTextFillComplete] = useState(false);
   const [isInThirdSection, setIsInThirdSection] = useState(false);
   const ellipseRef = useRef(ellipse);
   const secondSectionRef = useRef<HTMLDivElement>(null);
@@ -114,7 +115,7 @@ export default function Home() {
           }
         });
       },
-      { threshold: 1 }
+      { threshold: 0.6 }
     );
 
     if (secondSectionRef.current) {
@@ -161,36 +162,34 @@ export default function Home() {
     let scrollTimeout: NodeJS.Timeout;
     
     const handleThirdSectionWheelEvent = (e: WheelEvent) => {
+      // If text fill is complete, allow normal scrolling
+      if (isTextFillComplete) {
+        return;
+      }
+      
       if (isInThirdSection) {
         // Check if we're at the boundaries and should allow normal scrolling
         const isScrollingUp = e.deltaY < 0;
         const isScrollingDown = e.deltaY > 0;
         
-        // Allow normal scrolling up when fill is empty
-        if (isScrollingUp && textFillProgress <= 0) {
+        // Allow normal scrolling up when fill is empty OR when fill is complete
+        if (isScrollingUp && (textFillProgress <= 0 || isTextFillComplete)) {
           document.body.style.overflow = "auto";
           // Clear any existing timeout
           clearTimeout(scrollTimeout);
           // Re-disable overflow after a short delay to prevent interference
           scrollTimeout = setTimeout(() => {
-            if (isInThirdSection && textFillProgress > 0) {
+            if (isInThirdSection && textFillProgress > 0 && !isTextFillComplete) {
               document.body.style.overflow = "hidden";
             }
           }, 100);
           return; // Don't prevent default, allow normal scrolling
         }
         
-        // Allow normal scrolling down when fill is full
+        // Allow normal scrolling down when fill is full and mark as complete
         if (isScrollingDown && textFillProgress >= 100) {
+          setIsTextFillComplete(true);
           document.body.style.overflow = "auto";
-          // Clear any existing timeout
-          clearTimeout(scrollTimeout);
-          // Re-disable overflow after a short delay to prevent interference
-          scrollTimeout = setTimeout(() => {
-            if (isInThirdSection && textFillProgress < 100) {
-              document.body.style.overflow = "hidden";
-            }
-          }, 100);
           return; // Don't prevent default, allow normal scrolling
         }
         
@@ -203,12 +202,18 @@ export default function Home() {
         setTextFillProgress(prev => {
           const delta = e.deltaY * 0.2; // Adjust sensitivity
           const newProgress = Math.max(0, Math.min(100, prev + delta));
+          
+          // Mark as complete when reaching 100%
+          if (newProgress >= 100) {
+            setIsTextFillComplete(true);
+          }
+          
           return newProgress;
         });
       }
     };
 
-    if (isInThirdSection) {
+    if (isInThirdSection && !isTextFillComplete) {
       window.addEventListener('wheel', handleThirdSectionWheelEvent, { passive: false });
     } else {
       document.body.style.overflow = "auto";
@@ -219,7 +224,7 @@ export default function Home() {
       clearTimeout(scrollTimeout);
       window.removeEventListener('wheel', handleThirdSectionWheelEvent);
     };
-  }, [isInThirdSection, textFillProgress]);
+  }, [isInThirdSection, textFillProgress, isTextFillComplete]);
   
   // Scroll listener for photo gallery and background color change
   useEffect(() => {
@@ -240,7 +245,7 @@ export default function Home() {
       if (currentScrollY < firstSectionHeight) {
         // We're still in the first section, no color change
         setBackgroundColorProgress(0);
-        if (!isInThirdSection) {
+        if (!isInThirdSection && !isTextFillComplete) {
           setTextFillProgress(0);
         }
       } else if (currentScrollY < firstSectionHeight + secondSectionHeight) {
@@ -250,7 +255,7 @@ export default function Home() {
         const remainingHeight = documentHeight - windowHeight - firstSectionHeight;
         const progress = Math.min(scrollInSecondSections / remainingHeight, 1);
         setBackgroundColorProgress(progress);
-        if (!isInThirdSection) {
+        if (!isInThirdSection && !isTextFillComplete) {
           setTextFillProgress(0);
         }
       } else {
@@ -262,8 +267,8 @@ export default function Home() {
         const progress = Math.min(scrollInSecondSections / remainingHeight, 1);
         setBackgroundColorProgress(progress);
         
-        // Don't update text fill progress here when in third section - let the wheel handler control it
-        if (!isInThirdSection) {
+        // Don't update text fill progress here when in third section or when fill is complete
+        if (!isInThirdSection && !isTextFillComplete) {
           const scrollInThirdSection = currentScrollY - firstSectionHeight - secondSectionHeight;
           const thirdSectionScrollableHeight = windowHeight * 0.8;
           const fillProgress = Math.min(scrollInThirdSection / thirdSectionScrollableHeight, 1);
@@ -274,7 +279,7 @@ export default function Home() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isInThirdSection]);
+  }, [isInThirdSection, isTextFillComplete]);
 
   // Helper function to interpolate between colors
   const interpolateColor = (color1: string, color2: string, factor: number) => {
@@ -299,7 +304,7 @@ export default function Home() {
   // Calculate background colors based on scroll progress
   const getBackgroundColor = () => {
     // Transition from orange to brown
-    return interpolateColor('#ffd29d', '#ffa575ff', backgroundColorProgress);
+    return interpolateColor('#ffd29d', '#ffdbb2', backgroundColorProgress);
   };
   
   return (
@@ -436,45 +441,20 @@ export default function Home() {
       <div 
         ref={thirdSectionRef}
         style={{ 
-          minHeight: "100vh", // Made taller to allow more scrolling
-          background: getBackgroundColor(), 
+          minHeight: "80vh", // Made taller to allow more scrolling
+          background: getBackgroundColor(), // Simple static background color
           padding: "6rem 2rem",
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          alignItems: "center",
-          transition: "background 0.1s ease-out"
+          alignItems: "center"
         }}
       >
-        <div style={{ marginBottom: "4rem" }}>
-          <h2 style={{ 
-            fontFamily: "GT Ultra Fine, serif", 
-            fontSize: "2rem", 
-            color: "#8c4100ff",
-            textAlign: "center",
-            marginBottom: "1rem",
-            opacity: 0.9
-          }}>
-            Our Craft
-          </h2>
-          <p style={{ 
-            fontFamily: "GT Ultra Fine, sans-serif", 
-            fontSize: "1.1rem", 
-            color: "#8c4100ff",
-            maxWidth: "500px",
-            textAlign: "center",
-            lineHeight: "1.6",
-            opacity: 0.8
-          }}>
-            Every loaf tells a story of patience, tradition, and artisanal excellence.
-          </p>
-        </div>
         
         <LiquidFillText 
           fillPercentage={textFillProgress}
           liquidColor="#8c4100ff"
-          baseColor="#ffd29d"
-          fontSize="8rem"
+          baseColor="#ffecd6ff"
           fontFamily="GT Ultra Fine, serif"
         />
         
@@ -488,11 +468,220 @@ export default function Home() {
           marginTop: "3rem",
           opacity: 0.7
         }}>
-          * Or go big on both !
+          * Or go big on both!
         </p>
       </div>
 
-      {/* News section */}
+      {/* Shop section */}
+      <div style={{ 
+        minHeight: "100vh", 
+        background: getBackgroundColor(), 
+        padding: "6rem 2rem",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center"
+      }}>
+        <h2 style={{ 
+          fontFamily: "GT Ultra Fine, serif", 
+          fontSize: "4rem", 
+          color: "#8c4100ff",
+          marginBottom: "2rem",
+          textAlign: "center"
+        }}>
+          Our Shop
+        </h2>
+        
+        <p style={{ 
+          fontFamily: "GT Ultra Fine, sans-serif", 
+          fontSize: "0.8rem", 
+          color: "#8c4100ff",
+          maxWidth: "700px",
+          textAlign: "center",
+          lineHeight: "1.7",
+          marginBottom: "4rem",
+          opacity: 0.9
+        }}>
+          From our daily fresh sourdough loaves to delicate croissants and pastries, 
+          discover the artisanal treasures that make Patina Edinburgh special.
+        </p>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: "2.5rem",
+          maxWidth: "1000px",
+          width: "100%"
+        }}>
+          {/* Sourdough Card */}
+          <div style={{
+            backgroundColor: "#ffe8d1",
+            borderRadius: "20px",
+            padding: "0",
+            boxShadow: "0 12px 32px rgba(140, 65, 0, 0.15)",
+            textAlign: "center",
+            overflow: "hidden",
+            transition: "transform 0.3s ease, box-shadow 0.3s ease"
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = "translateY(-8px)";
+            e.currentTarget.style.boxShadow = "0 20px 40px rgba(140, 65, 0, 0.25)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 12px 32px rgba(140, 65, 0, 0.15)";
+          }}
+          >
+            <div style={{
+              width: "100%",
+              height: "280px",
+              backgroundImage: "url('images/1.webp')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              marginBottom: "1.5rem"
+            }} />
+            <div style={{ padding: "0 2rem 2rem 2rem" }}>
+              <h3 style={{ 
+                fontFamily: "GT Ultra Fine, serif", 
+                fontSize: "1rem", 
+                color: "#8c4100ff",
+              }}>
+                Lorem ipsum
+              </h3>
+              <div style={{ 
+                fontFamily: "GT Ultra Fine, serif", 
+                fontSize: "0.8rem", 
+                color: "#8c4100ff",
+                fontWeight: "bold"
+              }}>
+                £4.50
+              </div>
+            </div>
+          </div>
+
+          {/* Viennoiseries Card */}
+          <div style={{
+            backgroundColor: "#ffe8d1",
+            borderRadius: "20px",
+            padding: "0",
+            boxShadow: "0 12px 32px rgba(140, 65, 0, 0.15)",
+            textAlign: "center",
+            overflow: "hidden",
+            transition: "transform 0.3s ease, box-shadow 0.3s ease"
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = "translateY(-8px)";
+            e.currentTarget.style.boxShadow = "0 20px 40px rgba(140, 65, 0, 0.25)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 12px 32px rgba(140, 65, 0, 0.15)";
+          }}
+          >
+            <div style={{
+              width: "100%",
+              height: "280px",
+              backgroundImage: "url('images/2.webp')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              marginBottom: "1.5rem"
+            }} />
+            <div style={{ padding: "0 2rem 2rem 2rem" }}>
+              <h3 style={{ 
+                fontFamily: "GT Ultra Fine, serif", 
+                fontSize: "1rem", 
+                color: "#8c4100ff",
+              }}>
+                 Lorem dolor
+              </h3>
+              <div style={{ 
+                fontFamily: "GT Ultra Fine, serif", 
+                fontSize: "0.8rem", 
+                color: "#8c4100ff",
+                fontWeight: "bold"
+              }}>
+                £2.80
+              </div>
+            </div>
+          </div>
+
+          {/* Coffee Card */}
+          <div style={{
+            backgroundColor: "#ffe8d1",
+            borderRadius: "20px",
+            padding: "0",
+            boxShadow: "0 12px 32px rgba(140, 65, 0, 0.15)",
+            textAlign: "center",
+            overflow: "hidden",
+            transition: "transform 0.3s ease, box-shadow 0.3s ease"
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = "translateY(-8px)";
+            e.currentTarget.style.boxShadow = "0 20px 40px rgba(140, 65, 0, 0.25)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 12px 32px rgba(140, 65, 0, 0.15)";
+          }}
+          >
+            <div style={{
+              width: "100%",
+              height: "280px",
+              backgroundImage: "url('/images/3.webp')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              marginBottom: "1.5rem"
+            }} />
+            <div style={{ padding: "0 2rem 2rem 2rem" }}>
+              <h3 style={{ 
+                fontFamily: "GT Ultra Fine, serif", 
+                fontSize: "1rem", 
+                color: "#8c4100ff",
+              }}>
+                sit amet
+              </h3>
+              <div style={{ 
+                fontFamily: "GT Ultra Fine, serif", 
+                fontSize: "0.8rem", 
+                color: "#8c4100ff",
+                fontWeight: "bold"
+              }}>
+                £3.20
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: "4rem",
+          textAlign: "center"
+        }}>
+          <button style={{
+            backgroundColor: "#8c4100ff",
+            color: "#fff",
+            border: "none",
+            borderRadius: "16px",
+            padding: "1.2rem 3rem",
+            fontSize: "1.2rem",
+            fontFamily: "GT Ultra Fine, sans-serif",
+            fontWeight: "bold",
+            cursor: "pointer",
+            boxShadow: "0 8px 24px rgba(140, 65, 0, 0.3)",
+            transition: "transform 0.2s ease, box-shadow 0.2s ease"
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = "translateY(-3px)";
+            e.currentTarget.style.boxShadow = "0 12px 32px rgba(140, 65, 0, 0.4)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 8px 24px rgba(140, 65, 0, 0.3)";
+          }}
+          >
+            Visit Our Shop
+          </button>
+        </div>
+      </div>
       
       {/* Add CSS animation */}
       <style jsx>{`

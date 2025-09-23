@@ -13,10 +13,10 @@ export default function Navbar({ show = false }: NavbarProps) {
       
       <ul className="navbar-nav">
         <li>
-          <Link href="/shop">Shop</Link>
+          <Link href="/events">Events</Link>
         </li>
         <li>
-          <Link href="/news">News</Link>
+          <Link href="/shop">Shop</Link>
         </li>
         <li>
           <Link href="/team">Team</Link>
